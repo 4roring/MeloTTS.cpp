@@ -44,7 +44,8 @@ protected:
 };
 static constexpr int num_zh_tones = 6;
 static constexpr int num_ja_tones = 1;
-/*
+static constexpr int num_en_tones = 4;
+    /*
 Converts a string of text to a sequence of IDs corresponding to the symbols in the text.
 Also include the implementation of  hps.data.add_blank=True
 Note That in this function some constants are used to suit the condition of language == ZH_MIXED_WITH_EN
@@ -67,10 +68,13 @@ cleaned_text_to_sequence(std::shared_ptr<AbstractLanguageModule> language_module
         {"JP", 1},
         {"EN", 2},
         {"ZH", 3},
+        {"KR", 4}
     };
-    static std::unordered_map<std::string, int> language_tone_start_map = {{"ZH", 0},
+    static std::unordered_map<std::string, int> language_tone_start_map = {{"ZH", 0}, 
                                                                            {"JP", num_zh_tones},
-                                                                           {"EN", num_zh_tones + num_ja_tones}};
+                                                                           {"EN", num_zh_tones + num_ja_tones},
+                                                                           {"KR", num_zh_tones + num_ja_tones + num_en_tones} 
+    };
     int n = phones_list.size();
     std::vector<int64_t> phones(2 * n + 1, 0), tones(2 * n + 1, 0), lang_ids(2 * n + 1, 0);
     std::vector<int> word2ph(word2ph_list.begin(), word2ph_list.end());

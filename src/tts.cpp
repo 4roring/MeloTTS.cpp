@@ -21,10 +21,14 @@
 #include <chrono>
 #include <cmath>
 #include <fstream>
+#include <cwctype>
+#include <locale>
 
 #include "info_data.h"
 #include "language_modules/chinese_mix.h"
 #include "language_modules/english.h"
+#include "language_modules/korean.h"
+
 namespace melo {
 TTS::TTS(std::unique_ptr<ov::Core>& core,
          const std::filesystem::path& model_dir,
@@ -77,6 +81,13 @@ TTS::TTS(std::unique_ptr<ov::Core>& core,
         }
         tokenizer_dir_path = model_dir / "bert-base-uncased";
     }
+    else if (language == "KR")
+    {
+        bert_ir_path = model_dir / "bert_KR.xml";
+        tts_ir_path = model_dir / "tts_KR.xml";
+        tokenizer_dir_path = model_dir / "bert-base-multilingual-uncased";
+    }
+
     assert((std::filesystem::exists(tts_ir_path) && std::filesystem::exists(bert_ir_path)) &&
            "ir files or vocab_bert does not exit!");
     assert((std::filesystem::exists(tokenizer_dir_path)) && "tokenizer model folder does not exit!");
@@ -94,7 +105,10 @@ TTS::TTS(std::unique_ptr<ov::Core>& core,
         _language_module = std::make_shared<ChineseMix>(model_dir);
     } else if (language == "EN") {
         _language_module = std::make_shared<English>(core, model_dir);
-    } else
+    } else if (language == "KR") {
+        _language_module = std::make_shared<Korean>(core, model_dir);
+    }
+    else
         std::cerr << "[ERROR] Unsupported Language\n";
 
     // init bert
@@ -159,6 +173,8 @@ TTS::TTS(std::unique_ptr<ov::Core>& core,
         _language_module = std::make_shared<ChineseMix>(tts_ir_path.parent_path());
     } else if (language == "EN") {
         _language_module = std::make_shared<English>(core, tts_ir_path.parent_path());
+    } else if (language == "KR") {
+        _language_module = std::make_shared<Korean>(core, tts_ir_path.parent_path());
     } else
         std::cerr << "[ERROR] Unsupported Language\n";
 
@@ -205,7 +221,10 @@ void TTS::tts_to_file(const std::string& text,
         for (auto& sentence : sentences) {
             if (this->_language == "ZH") {
                 sentence = _language_module->text_normalize(sentence);
+            } else if (this->_language == "KR") {
+                sentence = _language_module->text_normalize(sentence);
             }
+
             // structured binding
             auto startTime = Time::now();
             auto [phone_level_feature, phones_ids, tones, lang_ids] = get_text_for_tts_infer(sentence);
@@ -268,11 +287,13 @@ void TTS::tts_to_file(const std::string& text,
         for (auto& sentence : sentences) {
             if (!sentence.size())
                 continue;
-            if (this->_language == "ZH") {
+            if (this->_language == "ZH" || this->_language == "KR") {
                 sentence = _language_module->text_normalize(sentence);
             }
+           
             auto startTime = Time::now();
             // structured binding
+
             auto [phone_level_feature, phones_ids, tones, lang_ids] = get_text_for_tts_infer(sentence);
             auto preProcess = get_duration_ms_till_now(startTime);
 
@@ -385,7 +406,7 @@ std::vector<std::string> TTS::split_sentences_zh(const std::string& text, size_t
         if (!num_matches) {
             tmp += text[i++];
         } else if ((text[i] == ',' || text[i] == '.') && i > 0 && i < n &&
-                   std::isdigit(static_cast<int>(text[i - 1])) && std::isdigit(static_cast<int>(text[i + 1]))) {
+                   std::iswdigit(static_cast<int>(text[i - 1])) && std::iswdigit(static_cast<int>(text[i + 1]))) {
             if (text[i] == '.')
                 tmp += ".";  // Keep the decimal point here for subsequent text normalization processing.
             i += results.front().length;
@@ -451,6 +472,7 @@ std::vector<std::string> TTS::split_sentences_into_pieces(const std::string& tex
 }
 const std::map<std::string, std::map<int, std::string>> TTS::speaker_ids = {
     {"ZH", {{1, "ZH-MIX-EN"}}},
+    {"KR", {{0, "KR"}}},
     {"EN", {{0, "EN-US"}, {1, "EN-BR"}, {2, "EN-INDIA"}, {3, "EN-AU"}, {4, "EN-Default"}}}};
 /**
  * @brief Concatenates audio segments with silence intervals, similar to Python's `audio_numpy_concat`.
